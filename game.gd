@@ -1,11 +1,14 @@
 extends Node2D
 
 
-const PACMAN_MOVE_SPEED := 64.0
+const PACMAN_MOVE_SPEED := 56.0
 
 
 @onready var astar_tiles: TileMapLayer = $AStarTiles
+@onready var dot_tiles: TileMapLayer = $DotTiles
 @onready var pacman: AnimatedSprite2D = $PacMan
+@onready var score_label: Label = $UI/ScoreLabel
+@onready var crazy_mode_timer: Timer = $CrazyModeTimer
 
 
 var astar := AStar2D.new()
@@ -13,6 +16,8 @@ var points: Dictionary[Vector2, int]
 var input_direction := Vector2.RIGHT
 var pacman_direction := Vector2.RIGHT
 var pacman_target_position := Vector2.ZERO
+var crazy_mode := false
+var score := 0
 
 
 func _ready() -> void:
@@ -25,8 +30,19 @@ func _process(delta: float) -> void:
 	update_input_direction()
 	
 	if pacman.position == pacman_target_position:
-		var input_target_tile := astar_tiles.local_to_map(pacman.position) as Vector2 + input_direction
-		var default_target_tile := astar_tiles.local_to_map(pacman.position) as Vector2 + pacman_direction
+		var pacman_map_position := astar_tiles.local_to_map(pacman.position)
+		var dot_data := dot_tiles.get_cell_tile_data(pacman_map_position)
+		if dot_data:
+			dot_tiles.set_cell(pacman_map_position)
+			var point_value := dot_data.get_custom_data("Point Value") as int
+			score += point_value
+			score_label.text = str(score)
+			if score >= 50:
+				crazy_mode = true
+				crazy_mode_timer.start()
+		
+		var input_target_tile := pacman_map_position as Vector2 + input_direction
+		var default_target_tile := pacman_map_position as Vector2 + pacman_direction
 		if input_direction != pacman_direction and input_target_tile in points:
 			pacman_direction = input_direction
 			pacman_target_position = astar_tiles.map_to_local(input_target_tile)
@@ -71,3 +87,7 @@ func print_point(id: int) -> void:
 	var pos := astar.get_point_position(id)
 	var connections := astar.get_point_connections(id)
 	print("Id = %d, Pos = %s, Connections = %s" % [id, pos, connections])
+
+
+func _on_crazy_mode_timer_timeout() -> void:
+	crazy_mode = false
